@@ -309,7 +309,7 @@ func (sh *scheduler) trySched() {
 		for _, wnd := range acceptableWindows[sqi] {
 			wid := sh.openWindows[wnd].worker
 			wr := sh.workers[wid].info.Hostname
-			log.Debugf("index: ",wnd," - ",wid," - ",wr)
+			log.Debugf("index-wnd:%d,wid:%d,wr:%s",wnd,wid,wr)
 		}
 	}
 
@@ -503,7 +503,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 		//--------------
 		if req.taskType == sealtasks.TTPreCommit2  {
 			w.totalP2Task++     //increment the totalP2Task of the worker
-			log.Debugf("P2Task++操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+			log.Debugf("P2Task++操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
 		}
 
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
@@ -516,7 +516,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			//-------------
 			if req.taskType == sealtasks.TTPreCommit2  {
 				w.totalP2Task--
-				log.Debugf("P2Task--操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+				log.Debugf("P2Task--操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
 			}
 
 			select {
@@ -558,7 +558,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			//decrease totalP2Task of the worker doing P2 Task
 			if req.taskType == sealtasks.TTPreCommit2 {
 				w.totalP2Task--
-				log.Debugf("P2Task--操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+				log.Debugf("P2Task--操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
 			}
 
 			return nil

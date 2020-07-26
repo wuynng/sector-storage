@@ -85,6 +85,8 @@ type workerHandle struct {
 	// stats / tracking
 	wt *workTracker
 
+	totalP2Task uint // ---------
+
 	// for sync manager goroutine closing
 	cleanupStarted bool
 	closedMgr      chan struct{}
@@ -302,6 +304,13 @@ func (sh *scheduler) trySched() {
 			}
 			return r
 		})
+		//-------------log
+		log.Debugf("order after cmp:",acceptableWindows[sqi])
+		for _, wnd := range acceptableWindows[sqi] {
+			wid := sh.openWindows[wnd].worker
+			wr := sh.workers[wid].info.Hostname
+			log.Debugf("index: ",wnd," - ",wid," - ",wr)
+		}
 	}
 
 	// Step 2
@@ -491,12 +500,24 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 	w.preparing.add(w.info.Resources, needRes)
 
 	go func() {
+		//--------------
+		if req.taskType == sealtasks.TTPreCommit2  {
+			w.totalP2Task++     //increment the totalP2Task of the worker
+			log.Debugf("P2Task++操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+		}
+
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()
 
 		if err != nil {
 			w.preparing.free(w.info.Resources, needRes)
 			sh.workersLk.Unlock()
+
+			//-------------
+			if req.taskType == sealtasks.TTPreCommit2  {
+				w.totalP2Task--
+				log.Debugf("P2Task--操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+			}
 
 			select {
 			case taskDone <- struct{}{}:
@@ -534,6 +555,12 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 				log.Warnf("scheduler closed while sending response")
 			}
 
+			//decrease totalP2Task of the worker doing P2 Task
+			if req.taskType == sealtasks.TTPreCommit2 {
+				w.totalP2Task--
+				log.Debugf("P2Task--操作wid-p2t-sectorid-host:",wid,"-",w.totalP2Task,"-",req.sector,"-",w.info.Hostname)
+			}
+
 			return nil
 		})
 
@@ -557,6 +584,8 @@ func (sh *scheduler) newWorker(w *workerHandle) {
 	id := sh.nextWorker
 	sh.workers[id] = w
 	sh.nextWorker++
+
+	w.totalP2Task = 0 //-----------
 
 	sh.workersLk.Unlock()
 

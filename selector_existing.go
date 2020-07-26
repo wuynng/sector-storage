@@ -55,6 +55,11 @@ func (s *existingSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt 
 }
 
 func (s *existingSelector) Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) {
+	if task == sealtasks.TTPreCommit2 {
+		if a. totalP2Task != b.totalP2Task {
+			return a.totalP2Task < b.totalP2Task, nil
+		}
+	}
 	return a.active.utilization(a.info.Resources) < b.active.utilization(b.info.Resources), nil
 }
 

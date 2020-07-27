@@ -54,6 +54,8 @@ type scheduler struct {
 	spt abi.RegisteredSealProof
 
 	workersLk  sync.Mutex
+	totalOpLk  sync.Mutex
+
 	nextWorker WorkerID
 	workers    map[WorkerID]*workerHandle
 
@@ -658,6 +660,7 @@ func (sh *scheduler) Close(ctx context.Context) error {
 const P2Weight = 11
 const C2Weight = 12
 func (sh *scheduler)totalDoing(wid WorkerID,w *workerHandle,req *workerRequest,doType uint){
+	sh.totalOpLk.Lock()
 	// dotype==1,task start ++weight ; dotype==0,task end --weight
 	if doType==1{
 		//increase totalP2Task of the worker doing P2 Task
@@ -674,12 +677,12 @@ func (sh *scheduler)totalDoing(wid WorkerID,w *workerHandle,req *workerRequest,d
 		//decrease totalP2Task of the worker doing P2 Task
 		if req.taskType == sealtasks.TTPreCommit2 {
 			w.total=w.total-P2Weight
-			log.Debugf("totalOpP2- wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+			log.Debugf("totalOpP2- wid:%d-p2t:%d-sectorid:%d-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
 		}
 		if req.taskType == sealtasks.TTCommit2 {
 			w.total=w.total-C2Weight
-			log.Debugf("totalOpC2- wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+			log.Debugf("totalOpC2- wid:%d-p2t:%d-sectorid:%d-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
 		}
 	}
-
+	sh.totalOpLk.Unlock()
 }

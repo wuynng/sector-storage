@@ -280,14 +280,6 @@ func (sh *scheduler) trySched() {
 		}
 		//--------------------
 		log.Debugf("order before cmp:taskType-d%,accWnd-%v",task.taskType,acceptableWindows[sqi])
-		for _, wnd := range acceptableWindows[sqi] {
-			wid := sh.openWindows[wnd].worker
-			wh:=sh.workers[wid]
-			wn := wh.info.Hostname
-			res:= wh.active.utilization(wh.info.Resources)
-			total:=wh.total
-			log.Debugf("index-wnd:%d,wid:%d,resutil:%f,total:d%,whn:%s",wnd,wid,res,total,wn)
-		}
 
 		// Pick best worker (shuffle in case some workers are equally as good)
 		rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {

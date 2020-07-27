@@ -29,7 +29,7 @@ func (s *taskSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi.
 	return supported, nil
 }
 
-func (s *taskSelector) Cmp(ctx context.Context, _ sealtasks.TaskType, a, b *workerHandle) (bool, error) {
+func (s *taskSelector) Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) {
 	atasks, err := a.w.TaskTypes(ctx)
 	if err != nil {
 		return false, xerrors.Errorf("getting supported worker task types: %w", err)
@@ -41,7 +41,11 @@ func (s *taskSelector) Cmp(ctx context.Context, _ sealtasks.TaskType, a, b *work
 	if len(atasks) != len(btasks) {
 		return len(atasks) < len(btasks), nil // prefer workers which can do less
 	}
-
+	if task == sealtasks.TTPreCommit2 || task == sealtasks.TTCommit2{
+		if a.total != b.total {
+			return a.total < b.total, nil
+		}
+	}
 	return a.active.utilization(a.info.Resources) < b.active.utilization(b.info.Resources), nil
 }
 

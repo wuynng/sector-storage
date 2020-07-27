@@ -85,7 +85,7 @@ type workerHandle struct {
 	// stats / tracking
 	wt *workTracker
 
-	totalP2Task uint // ---------
+	total uint // ---------
 
 	// for sync manager goroutine closing
 	cleanupStarted bool
@@ -278,6 +278,16 @@ func (sh *scheduler) trySched() {
 		if len(acceptableWindows[sqi]) == 0 {
 			continue
 		}
+		//--------------------
+		log.Debugf("order before cmp:taskType-d%,accWnd-%v",task.taskType,acceptableWindows[sqi])
+		for _, wnd := range acceptableWindows[sqi] {
+			wid := sh.openWindows[wnd].worker
+			wh:=sh.workers[wid]
+			wn := wh.info.Hostname
+			res:= wh.active.utilization(wh.info.Resources)
+			total:=wh.total
+			log.Debugf("index-wnd:%d,wid:%d,resutil:%f,total:d%,whn:%s",wnd,wid,res,total,wn)
+		}
 
 		// Pick best worker (shuffle in case some workers are equally as good)
 		rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
@@ -305,11 +315,14 @@ func (sh *scheduler) trySched() {
 			return r
 		})
 		//-------------log
-		log.Debugf("order after cmp:",acceptableWindows[sqi])
+		log.Debugf("order after cmp:taskType-d%,accWnd-%v",task.taskType,acceptableWindows[sqi])
 		for _, wnd := range acceptableWindows[sqi] {
 			wid := sh.openWindows[wnd].worker
-			wr := sh.workers[wid].info.Hostname
-			log.Debugf("index-wnd:%d,wid:%d,wr:%s",wnd,wid,wr)
+			wh:=sh.workers[wid]
+			wn := wh.info.Hostname
+			res:= wh.active.utilization(wh.info.Resources)
+			total:=wh.total
+			log.Debugf("index-wnd:%d,wid:%d,resutil:%f,total:d%,whn:%s",wnd,wid,res,total,wn)
 		}
 	}
 
@@ -501,10 +514,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 
 	go func() {
 		//--------------
-		if req.taskType == sealtasks.TTPreCommit2  {
-			w.totalP2Task++     //increment the totalP2Task of the worker
-			log.Debugf("P2Task++操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
-		}
+		sh.totalDoing(wid,w,req,1)
 
 		err := req.prepare(req.ctx, w.wt.worker(w.w))
 		sh.workersLk.Lock()
@@ -514,10 +524,7 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			sh.workersLk.Unlock()
 
 			//-------------
-			if req.taskType == sealtasks.TTPreCommit2  {
-				w.totalP2Task--
-				log.Debugf("P2Task--操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
-			}
+			sh.totalDoing(wid,w,req,0)
 
 			select {
 			case taskDone <- struct{}{}:
@@ -554,12 +561,8 @@ func (sh *scheduler) assignWorker(taskDone chan struct{}, wid WorkerID, w *worke
 			case <-sh.closing:
 				log.Warnf("scheduler closed while sending response")
 			}
-
-			//decrease totalP2Task of the worker doing P2 Task
-			if req.taskType == sealtasks.TTPreCommit2 {
-				w.totalP2Task--
-				log.Debugf("P2Task--操作wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.totalP2Task,req.sector.Number,w.info.Hostname)
-			}
+			//------------------
+			sh.totalDoing(wid,w,req,0)
 
 			return nil
 		})
@@ -585,7 +588,7 @@ func (sh *scheduler) newWorker(w *workerHandle) {
 	sh.workers[id] = w
 	sh.nextWorker++
 
-	w.totalP2Task = 0 //-----------
+	w.total = 0 //-----------
 
 	sh.workersLk.Unlock()
 
@@ -658,4 +661,33 @@ func (sh *scheduler) Close(ctx context.Context) error {
 		return ctx.Err()
 	}
 	return nil
+}
+
+const P2Weight = 11
+const C2Weight = 12
+func (sh *scheduler)totalDoing(wid WorkerID,w *workerHandle,req *workerRequest,doType uint){
+	// dotype==1,task start ++weight ; dotype==0,task end --weight
+	if doType==1{
+		//increase totalP2Task of the worker doing P2 Task
+		if req.taskType == sealtasks.TTPreCommit2 {
+			w.total=w.total+P2Weight
+			log.Debugf("totalOpP2+ wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+		}
+		if req.taskType == sealtasks.TTCommit2 {
+			w.total=w.total+C2Weight
+			log.Debugf("totalOpC2+ wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+		}
+	}
+	if doType==0{
+		//decrease totalP2Task of the worker doing P2 Task
+		if req.taskType == sealtasks.TTPreCommit2 {
+			w.total=w.total-P2Weight
+			log.Debugf("totalOpP2- wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+		}
+		if req.taskType == sealtasks.TTCommit2 {
+			w.total=w.total-C2Weight
+			log.Debugf("totalOpC2- wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+		}
+	}
+
 }

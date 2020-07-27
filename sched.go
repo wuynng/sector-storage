@@ -279,7 +279,7 @@ func (sh *scheduler) trySched() {
 			continue
 		}
 		//--------------------
-		log.Debugf("order before cmp:taskType-d%,accWnd-%v",task.taskType,acceptableWindows[sqi])
+		log.Debugf("order before cmp:taskType-%s,accWnd-%v",task.taskType,acceptableWindows[sqi])
 
 		// Pick best worker (shuffle in case some workers are equally as good)
 		rand.Shuffle(len(acceptableWindows[sqi]), func(i, j int) {
@@ -307,14 +307,14 @@ func (sh *scheduler) trySched() {
 			return r
 		})
 		//-------------log
-		log.Debugf("order after cmp:taskType-d%,accWnd-%v",task.taskType,acceptableWindows[sqi])
+		log.Debugf("order after cmp:taskType-%s,accWnd-%v",task.taskType,acceptableWindows[sqi])
 		for _, wnd := range acceptableWindows[sqi] {
 			wid := sh.openWindows[wnd].worker
 			wh:=sh.workers[wid]
 			wn := wh.info.Hostname
 			res:= wh.active.utilization(wh.info.Resources)
 			total:=wh.total
-			log.Debugf("index-wnd:%d,wid:%d,resutil:%f,total:d%,whn:%s",wnd,wid,res,total,wn)
+			log.Debugf("index-wnd:%d,wid:%d,resutil:%f,total:%d,whn:%s",wnd,wid,res,total,wn)
 		}
 	}
 
@@ -663,11 +663,11 @@ func (sh *scheduler)totalDoing(wid WorkerID,w *workerHandle,req *workerRequest,d
 		//increase totalP2Task of the worker doing P2 Task
 		if req.taskType == sealtasks.TTPreCommit2 {
 			w.total=w.total+P2Weight
-			log.Debugf("totalOpP2+ wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+			log.Debugf("totalOpP2+ wid:%d-p2t:%d-sectorid:%d-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
 		}
 		if req.taskType == sealtasks.TTCommit2 {
 			w.total=w.total+C2Weight
-			log.Debugf("totalOpC2+ wid:%d-p2t:%d-sectorid:d%-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
+			log.Debugf("totalOpC2+ wid:%d-p2t:%d-sectorid:%d-host:%s",wid,w.total,req.sector.Number,w.info.Hostname)
 		}
 	}
 	if doType==0{
